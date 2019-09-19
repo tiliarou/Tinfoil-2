@@ -36,7 +36,7 @@ SOURCES     := source source/install source/ipc source/lib source/asset source/d
 DATA        := data
 INCLUDES    := include
 EXEFS_SRC   := exefs_src
-ROMFS       := romfs
+#ROMFS       := romfs
 APP_TITLE   := Tinfoil
 APP_AUTHOR  := Adubbz
 APP_VERSION := 0.2.1
@@ -60,12 +60,12 @@ CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 
 CFLAGS	+=	$(INCLUDE) -D__SWITCH__ `freetype-config --cflags`
 
-CXXFLAGS	:= $(CFLAGS) -std=gnu++17 $(CXXFLAGS)
+CXXFLAGS	:= $(CFLAGS) -fno-rtti -std=gnu++17 $(CXXFLAGS)
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:= `freetype-config --libs` -lcurl -lz -lnx
+LIBS	:= `freetype-config --libs` -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lz -lnx
 
 
 

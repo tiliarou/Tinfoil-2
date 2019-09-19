@@ -18,6 +18,8 @@
 #include "install/http_nsp.hpp"
 #include "debug.h"
 #include "error.hpp"
+#include "translate.h"
+#include "options.h"
 
 namespace tin::ui
 {
@@ -28,7 +30,7 @@ namespace tin::ui
     static int m_clientSocket = 0;
 
     NetworkInstallMode::NetworkInstallMode() :
-        IMode("Network Install NSP")
+        IMode(translate(Translate::NSP_INSTALL_NETWORK))
     {
     }
 
@@ -124,9 +126,9 @@ namespace tin::ui
 
             struct in_addr addr = {(in_addr_t) gethostid()};
 
-            printf("Switch IP is %s\n", inet_ntoa(addr));
-            printf("Waiting for connection...\n");
-            printf("Press B to cancel\n");
+            printf("%s %s\n", translate(Translate::SWITCH_IP_IS), inet_ntoa(addr));
+            printf("%s\n", translate(Translate::NSP_INSTALL_NETWORK_WAITING));
+            printf("%s\n", translate(Translate::PRESS_B_CANCEL));
             
             std::vector<std::string> urls;
 
@@ -134,14 +136,15 @@ namespace tin::ui
 
             // Do this now because otherwise we won't get an opportunity whilst waiting
             // in the loop
-            gfxFlushBuffers();
-            gfxSwapBuffers();
+            consoleUpdate(NULL);
 
             while (true)
             {
                 // Break on input pressed
                 hidScanInput();
                 u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
+
+                consoleUpdate(NULL);
 
                 if (kDown & KEY_B)
                 {
@@ -156,7 +159,7 @@ namespace tin::ui
 
                 if (m_clientSocket >= 0)
                 {
-                    printf("Accepted client connection\n");
+                    printf("%s\n", translate(Translate::NSP_INSTALL_NETWORK_ACCEPT));
                     u32 size = 0;
                     tin::network::WaitReceiveNetworkData(m_clientSocket, &size, sizeof(u32));
                     size = ntohl(size);
@@ -196,7 +199,7 @@ namespace tin::ui
             if (!canceled)
             {
                 auto view = std::make_unique<tin::ui::ConsoleCheckboxView>(std::bind(&NetworkInstallMode::OnNSPSelected, this), DEFAULT_TITLE, 2);
-                view->AddEntry("Select NSP to install", tin::ui::ConsoleEntrySelectType::HEADING, nullptr);
+                view->AddEntry(translate(Translate::NSP_SELECT), tin::ui::ConsoleEntrySelectType::HEADING, nullptr);
                 view->AddEntry("", tin::ui::ConsoleEntrySelectType::NONE, nullptr);
                 
                 for (auto& url : urls)
@@ -222,7 +225,7 @@ namespace tin::ui
         tin::ui::ViewManager& manager = tin::ui::ViewManager::Instance();
         ConsoleCheckboxView* prevView;
 
-        if (!(prevView = dynamic_cast<ConsoleCheckboxView*>(manager.GetCurrentView())))
+        if (!(prevView = reinterpret_cast<ConsoleCheckboxView*>(manager.GetCurrentView())))
         {
             throw std::runtime_error("Previous view must be a ConsoleCheckboxView!");
         }
@@ -235,10 +238,10 @@ namespace tin::ui
         }
 
         auto view = std::make_unique<tin::ui::ConsoleOptionsView>(DEFAULT_TITLE);
-        view->AddEntry("Select Destination", tin::ui::ConsoleEntrySelectType::HEADING, nullptr);
+        view->AddEntry(translate(Translate::NSP_INSTALL_SELECT_DESTINATION), tin::ui::ConsoleEntrySelectType::HEADING, nullptr);
         view->AddEntry("", tin::ui::ConsoleEntrySelectType::NONE, nullptr);
-        view->AddEntry("SD Card", tin::ui::ConsoleEntrySelectType::SELECT, std::bind(&NetworkInstallMode::OnDestinationSelected, this));
-        view->AddEntry("NAND", tin::ui::ConsoleEntrySelectType::SELECT, std::bind(&NetworkInstallMode::OnDestinationSelected, this));
+        view->AddEntry(translate(Translate::SDCARD), tin::ui::ConsoleEntrySelectType::SELECT, std::bind(&NetworkInstallMode::OnDestinationSelected, this));
+        view->AddEntry(translate(Translate::NAND), tin::ui::ConsoleEntrySelectType::SELECT, std::bind(&NetworkInstallMode::OnDestinationSelected, this));
         manager.PushView(std::move(view));
     }
 
@@ -247,7 +250,7 @@ namespace tin::ui
         tin::ui::ViewManager& manager = tin::ui::ViewManager::Instance();
         ConsoleOptionsView* prevView;
 
-        if (!(prevView = dynamic_cast<ConsoleOptionsView*>(manager.GetCurrentView())))
+        if (!(prevView = reinterpret_cast<ConsoleOptionsView*>(manager.GetCurrentView())))
         {
             throw std::runtime_error("Previous view must be a ConsoleOptionsView!");
         }
@@ -255,7 +258,7 @@ namespace tin::ui
         auto destStr = prevView->GetSelectedOptionValue()->GetText();
         m_destStorageId = FsStorageId_SdCard;
 
-        if (destStr == "NAND")
+        if (destStr == translate(Translate::NAND))
         {
             m_destStorageId = FsStorageId_NandUser;
         }
@@ -267,10 +270,10 @@ namespace tin::ui
         {
             tin::install::nsp::HTTPNSP httpNSP(url);
 
-            printf("Installing from %s\n", url.c_str());
-            tin::install::nsp::RemoteNSPInstall install(m_destStorageId, false, &httpNSP);
+            printf("%s %s\n", translate(Translate::NSP_INSTALL_FROM), url.c_str());
+            tin::install::nsp::RemoteNSPInstall install(m_destStorageId, Options().GetIgnoreFirmwareVersion(), &httpNSP);
 
-            printf("Preparing install...\n");
+            printf("%s\n", translate(Translate::NSP_INSTALL_PREPARING));
             install.Prepare();
             LOG_DEBUG("Pre Install Records: \n");
             install.DebugPrintInstallData();
@@ -280,13 +283,12 @@ namespace tin::ui
             printf("\n");
         }
 
-        printf("Sending ack...\n");
+        printf("%s\n", translate(Translate::NSP_INSTALL_NETWORK_SENDING_ACK));
         // Send 1 byte ack to close the server
         u8 ack = 0;
         tin::network::WaitSendNetworkData(m_clientSocket, &ack, sizeof(u8));
-        printf("\n Press (B) to return.");
+        printf("\n %s", translate(Translate::PRESS_B_RETURN));
 
-        gfxFlushBuffers();
-        gfxSwapBuffers();
+        consoleUpdate(NULL);
     }
 }

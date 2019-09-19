@@ -4,6 +4,9 @@
 #include "util/graphics_util.hpp"
 #include "util/title_util.hpp"
 #include "error.hpp"
+#include "translate.h"
+
+#define OPTIONS_VIEW_PAGE_SIZE 42
 
 namespace tin::ui
 {
@@ -15,7 +18,7 @@ namespace tin::ui
 
     }
 
-    std::string TextOptionValue::GetText()
+    const std::string& TextOptionValue::GetText()
     {
         return this->name;
     }
@@ -30,9 +33,22 @@ namespace tin::ui
 
     }
 
-    std::string TitleIdOptionValue::GetText()
+    const std::string& TitleIdOptionValue::GetText()
     {
-        return ""; //TODO
+        if (!name.size())
+        {
+            name = tin::util::GetBaseTitleName(titleId);
+
+            if (!name.size())
+            {
+                name = translate(Translate::UNKNOWN);
+
+                char titleIdStr[34] = { 0 };
+                snprintf(titleIdStr, 34 - 1, "%016lx", titleId);
+                name += " - " + std::string(titleIdStr);
+            }
+        }
+        return name;
     }
 
     // End TitleIdOptionValue
@@ -45,26 +61,29 @@ namespace tin::ui
 
     }
 
-    std::string RightsIdOptionValue::GetText()
+    const std::string& RightsIdOptionValue::GetText()
     {
-        u64 titleId = tin::util::GetRightsIdTid(this->rightsId);
-        u64 keyGen = tin::util::GetRightsIdKeyGen(this->rightsId);
-        std::string titleName = tin::util::GetBaseTitleName(titleId);
-
-        if (titleName.empty() || titleName == "Unknown")
+        if (name.length() == 0)
         {
-            try
+            u64 titleId = tin::util::GetRightsIdTid(this->rightsId);
+            u64 keyGen = tin::util::GetRightsIdKeyGen(this->rightsId);
+            name = tin::util::GetBaseTitleName(titleId);
+
+            if (name.empty() || name == "Unknown")
             {
-                titleName = tin::util::GetBaseTitleName(titleId ^ 0x800);
+                try
+                {
+                    name = tin::util::GetBaseTitleName(titleId ^ 0x800);
+                }
+                catch (...) {}
             }
-            catch (...) {}
+
+            char rightsIdStr[34] = { 0 };
+            snprintf(rightsIdStr, 34 - 1, "%016lx%016lx", titleId, keyGen);
+            name += " - " + std::string(rightsIdStr);
         }
 
-        char rightsIdStr[34] = {0};
-        snprintf(rightsIdStr, 34-1, "%016lx%016lx", titleId, keyGen);
-        titleName += " - " + std::string(rightsIdStr);
-
-        return titleName;
+        return name;
     }
 
     // End RightsIdOptionValue
@@ -109,6 +128,10 @@ namespace tin::ui
             this->MoveCursor(1);
         else if (keys & KEY_UP)
             this->MoveCursor(-1);
+        else if (keys & KEY_ZL)
+            this->MoveCursor(-OPTIONS_VIEW_PAGE_SIZE);
+        else if (keys & KEY_ZR)
+            this->MoveCursor(OPTIONS_VIEW_PAGE_SIZE);
         else if (keys & KEY_A)
         {
             ConsoleEntry* consoleEntry = m_consoleEntries.at(m_cursorPos).get();
@@ -143,7 +166,7 @@ namespace tin::ui
 
     void ConsoleOptionsView::MoveCursor(signed char off)
     {
-        if (off != -1 && off != 1)
+        if (off != -1 && off != 1 && off != OPTIONS_VIEW_PAGE_SIZE && off != -OPTIONS_VIEW_PAGE_SIZE)
             return;
 
         this->ClearCursor();
@@ -167,7 +190,17 @@ namespace tin::ui
             }
         }
 
-        this->DisplayCursor();
+        if (m_cursorPos >= m_offset + OPTIONS_VIEW_PAGE_SIZE)
+        {
+            m_offset = m_cursorPos - OPTIONS_VIEW_PAGE_SIZE + 1;
+        }
+
+        if (m_cursorPos < m_offset)
+        {
+            m_offset = m_cursorPos;
+        }
+
+        this->DisplayAll();
     }
 
     void ConsoleOptionsView::DisplayAll()
@@ -180,14 +213,21 @@ namespace tin::ui
         tin::util::PrintTextCentred(m_title);
         console->flags &= ~CONSOLE_COLOR_BOLD;
 
-        // Print the entries
-        for (auto& entry : m_consoleEntries)
+        if (m_consoleEntries.size())
         {
-            char optionValueText[78] = {0};
-            strncpy(optionValueText, entry->optionValue->GetText().c_str(), 78-1);
-
-            switch (entry->selectType)
+            if (m_offset >= m_consoleEntries.size())
             {
+                m_offset = m_consoleEntries.size() - 1;
+            }
+            // Print the entries
+            for (unsigned int i = 0; i < OPTIONS_VIEW_PAGE_SIZE && m_offset + i < m_consoleEntries.size(); i++)
+            {
+                auto& entry = m_consoleEntries[m_offset + i];
+                char optionValueText[78] = { 0 };
+                strncpy(optionValueText, entry->optionValue->GetText().c_str(), 78 - 1);
+
+                switch (entry->selectType)
+                {
                 case ConsoleEntrySelectType::HEADING:
                     console->flags |= CONSOLE_COLOR_BOLD;
                     printf("%s\n", optionValueText);
@@ -206,6 +246,7 @@ namespace tin::ui
 
                 default:
                     printf("\n");
+                }
             }
         }
 
@@ -216,12 +257,12 @@ namespace tin::ui
     {
         auto console = ViewManager::Instance().m_printConsole;
         console->cursorX = 0;
-        console->cursorY = m_cursorPos + 2;
+        console->cursorY = (m_cursorPos - m_offset) + 2;
         console->flags |= CONSOLE_COLOR_BOLD;
         printf("%s> ", CONSOLE_CYAN);
         console->flags &= ~CONSOLE_COLOR_BOLD;
         console->cursorX = 0;
-        console->cursorY = m_cursorPos + 3;
+        console->cursorY = (m_cursorPos - m_offset) + 3;
         printf("%s", CONSOLE_RESET);
     }
 
@@ -229,7 +270,7 @@ namespace tin::ui
     {
         auto console = ViewManager::Instance().m_printConsole;
         console->cursorX = 0;
-        console->cursorY = m_cursorPos + 2;
+        console->cursorY = (m_cursorPos - m_offset) + 2;
         printf("  ");
     }
 }

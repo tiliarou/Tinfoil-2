@@ -7,11 +7,12 @@
 #include "ui/framework/console_options_view.hpp"
 #include "ui/framework/view.hpp"
 #include "error.hpp"
+#include "translate.h"
 
 namespace tin::ui
 {
     DeletePersonalizedTicketMode::DeletePersonalizedTicketMode() :
-        IMode("Delete Personalized Ticket")
+        IMode(translate(Translate::TICKET_PERSONAL_DELETE))
     {
 
     }
@@ -52,12 +53,12 @@ namespace tin::ui
         ConsoleOptionsView* prevView;
         RightsIdOptionValue* optionValue;
 
-        if (!(prevView = dynamic_cast<ConsoleOptionsView*>(manager.GetCurrentView())))
+        if (!(prevView = reinterpret_cast<ConsoleOptionsView*>(manager.GetCurrentView())))
         {
             throw std::runtime_error("View must be a ConsoleOptionsView!");
         }
 
-        if (!(optionValue = dynamic_cast<RightsIdOptionValue*>(prevView->GetSelectedOptionValue())))
+        if (!(optionValue = reinterpret_cast<RightsIdOptionValue*>(prevView->GetSelectedOptionValue())))
         {
             throw std::runtime_error("Option value must be a RightsIdOptionValue");
         }
@@ -73,7 +74,7 @@ namespace tin::ui
 
         ASSERT_OK(esDeleteTicket(&rightsId, sizeof(RightsId)), "Failed to delete personalized ticket");
 
-        printf("Deleted personalized ticket successfully!\n\nPress (B) to return.\n");
+        printf("%s\n\n%s\n", translate(Translate::TICKET_PERSONAL_DELETE_SUCCESS), translate(Translate::PRESS_B_RETURN));
         prevView->GetSelectedEntry()->selectType = ConsoleEntrySelectType::SELECT_INACTIVE;
     }
 }
